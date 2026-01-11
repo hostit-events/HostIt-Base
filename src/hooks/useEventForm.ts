@@ -1,5 +1,12 @@
 // useEventForm.ts
 import { useRef, useState } from "react";
+import { createEvent } from "@/lib/eventApi";
+import { useRouter } from "next/navigation";
+import { prepareContractTicketData } from "@/lib/contractService";
+import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { getAddress } from "viem";
+import { toast } from "sonner";
+import ticketFactory from "../abis/TicketFactoryFacet.json";
 
 export type TicketType = {
   id: number;
@@ -55,7 +62,17 @@ export const useEventForm = (opts?: { onValidSubmit?: (data: EventFormData) => v
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [isCreatingContract, setIsCreatingContract] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Watch for contract transaction status
+  const { isLoading: isConfirming, isSuccess: isContractSuccess } = useWaitForTransactionReceipt({
+    hash: contractTxHash,
+  });
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -187,6 +204,22 @@ export const useEventForm = (opts?: { onValidSubmit?: (data: EventFormData) => v
     }
   };
 
+  const openLocationPicker = () => {
+    setShowLocationPicker(true);
+  };
+
+  const closeLocationPicker = () => {
+    setShowLocationPicker(false);
+  };
+
+  const selectLocation = (location: string) => {
+    setFormData((prev) => ({ ...prev, location }));
+    if (errors.location) {
+      setErrors((prev) => ({ ...prev, location: undefined }));
+    }
+    setShowLocationPicker(false);
+  };
+
   const validateForm = (): ValidationErrors => {
     const newErrors: ValidationErrors = {};
 
@@ -247,6 +280,14 @@ export const useEventForm = (opts?: { onValidSubmit?: (data: EventFormData) => v
     const ticketErrors: { [key: number]: { name?: string; price?: string; quantity?: string } } = {};
     let hasValidTicket = false;
 
+    // First, check if there's at least one valid ticket (regardless of touched state)
+    formData.ticketTypes.forEach((ticket) => {
+      if (ticket.name.trim() && parseFloat(ticket.price) > 0 && parseInt(ticket.quantity) > 0) {
+        hasValidTicket = true;
+      }
+    });
+
+    // Then validate only touched tickets for showing error messages
     formData.ticketTypes.forEach((ticket) => {
       const ticketTouched = touched[`ticket_${ticket.id}_name`] || touched[`ticket_${ticket.id}_price`] || touched[`ticket_${ticket.id}_quantity`];
       if (!ticketTouched) return; // Skip validation for untouched tickets
@@ -304,7 +345,58 @@ export const useEventForm = (opts?: { onValidSubmit?: (data: EventFormData) => v
     return newErrors;
   };
 
-  const handleSubmit = () => {
+  const hasErrors = (): boolean => {
+    // Check for top-level errors
+    if (errors.eventName || errors.organizer || errors.location ||
+        errors.startDate || errors.endDate || errors.eventType ||
+        errors.description || errors.eventImage || errors.ticketTypes) {
+      return true;
+    }
+
+    // Check for ticket-specific errors
+    if (errors.ticketErrors) {
+      const hasTicketErrors = Object.values(errors.ticketErrors).some(
+        ticketError => ticketError.name || ticketError.price || ticketError.quantity
+      );
+      if (hasTicketErrors) return true;
+    }
+
+    return false;
+  };
+
+  const isFormComplete = (): boolean => {
+    // Check all required fields are filled
+    if (!formData.eventName.trim()) return false;
+    if (!formData.organizer.trim()) return false;
+    if (!formData.location.trim()) return false;
+    if (!formData.startDate) return false;
+    if (!formData.endDate) return false;
+    if (!formData.eventType) return false;
+    if (!formData.eventImage) return false;
+
+    // Check description has actual content (not just HTML tags)
+    const plainTextDescription = formData.description.replace(/<[^>]*>/g, "").trim();
+    if (!plainTextDescription) return false;
+
+    // Check at least one ticket type is complete (has name, price > 0, quantity > 0)
+    const hasCompleteTicket = formData.ticketTypes.some(
+      ticket =>
+        ticket.name.trim() !== "" &&
+        ticket.price.trim() !== "" &&
+        parseFloat(ticket.price) > 0 &&
+        ticket.quantity.trim() !== "" &&
+        parseInt(ticket.quantity) > 0
+    );
+    if (!hasCompleteTicket) return false;
+
+    return true;
+  };
+
+  const handleSubmit = async () => {
+    // Reset submission states
+    setSubmitError(null);
+    setSubmitSuccess(false);
+
     // Mark all fields as touched to show validation errors
     const allFields = ['eventName', 'organizer', 'location', 'startDate', 'endDate', 'eventType', 'description'];
     const newTouched: Record<string, boolean> = {};
@@ -338,6 +430,14 @@ export const useEventForm = (opts?: { onValidSubmit?: (data: EventFormData) => v
     touched,
     selectedImage,
     fileInputRef,
+    showLocationPicker,
+    isSubmitting,
+    submitError,
+    submitSuccess,
+    contractTxHash,
+    isCreatingContract,
+    isConfirming,
+    isContractSuccess,
     handleInputChange,
     handleInputBlur,
     handleDescriptionChange,
@@ -348,5 +448,10 @@ export const useEventForm = (opts?: { onValidSubmit?: (data: EventFormData) => v
     updateTicketType,
     handleFileSelect,
     handleSubmit,
+    isFormComplete,
+    hasErrors,
+    openLocationPicker,
+    closeLocationPicker,
+    selectLocation,
   };
 };

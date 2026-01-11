@@ -29,6 +29,14 @@ const Page = () => {
     touched,
     selectedImage,
     fileInputRef,
+    showLocationPicker,
+    isSubmitting,
+    submitError,
+    submitSuccess,
+    contractTxHash,
+    isCreatingContract,
+    isConfirming,
+    isContractSuccess,
     handleInputChange,
     handleInputBlur,
     handleDescriptionChange,
@@ -122,6 +130,7 @@ const Page = () => {
   }
 
   return (
+    <>
     <div className="flex flex-col lg:flex-row gap-6 mx-auto w-full max-w-[1200px] p-4 md:p-6 mb-14">
       {/* Left Column - Image and Location */}
       <div className="flex flex-col md:flex-row lg:flex-col gap-6 w-full lg:w-auto">
@@ -156,13 +165,16 @@ const Page = () => {
         
         <div className="flex flex-col gap-3">
           <h3 className="text-lg font-bold text-white">Pick a Location</h3>
-          <div className="h-64 w-full sm:w-64 md:h-80 md:w-80 relative cursor-pointer">
+          <div
+            className="h-64 w-full sm:w-64 md:h-80 md:w-80 relative cursor-pointer"
+            onClick={openLocationPicker}
+          >
             <img
               src="/pick-location.png"
               alt="Location picker"
               className="h-full w-full rounded-2xl object-cover"
             />
-            <div className="absolute inset-0 bg-black bg-opacity-50 rounded-2xl flex items-center justify-center">
+            <div className="absolute inset-0 bg-black bg-opacity-50 rounded-2xl flex items-center justify-center hover:bg-opacity-40 transition-all duration-200">
               <div className="bg-black rounded-full p-3 md:p-4">
                 <MdAddLocationAlt className="text-white" size={20} />
               </div>
@@ -565,6 +577,79 @@ const Page = () => {
         }
       `}</style>
     </div>
+
+      {/* Location Picker Modal */}
+      {showLocationPicker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 p-4">
+          <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-white/20">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-white">Pick a Location</h2>
+              <button
+                onClick={closeLocationPicker}
+                className="text-white/60 hover:text-white transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Search/Input Location */}
+              <div>
+                <label className="block text-white mb-2 font-medium">
+                  Search or Enter Location
+                </label>
+                <input
+                  type="text"
+                  value={formData.location}
+                  onChange={(e) => {
+                    handleInputChange(e);
+                  }}
+                  name="location"
+                  placeholder="Enter location address"
+                  className="w-full bg-transparent border border-white/60 h-14 text-lg p-4 rounded-xl text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/80"
+                />
+              </div>
+
+              {/* Map Placeholder - Replace with actual map component */}
+              <div className="h-96 bg-gray-800 rounded-xl border border-white/20 flex items-center justify-center relative overflow-hidden">
+                <img
+                  src="/pick-location.png"
+                  alt="Map placeholder"
+                  className="w-full h-full object-cover opacity-30"
+                />
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-white/60">
+                  <MdAddLocationAlt size={48} className="mb-2" />
+                  <p className="text-center">
+                    Map integration coming soon
+                    <br />
+                    <span className="text-sm">
+                      Enter location manually above
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4">
+                <Button
+                  onClick={closeLocationPicker}
+                  className="flex-1 bg-white/10 hover:bg-white/20 text-white"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => selectLocation(formData.location)}
+                  className="flex-1 bg-subsidiary hover:bg-subsidiary/80 text-white"
+                  disabled={!formData.location.trim()}
+                >
+                  Confirm Location
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 
